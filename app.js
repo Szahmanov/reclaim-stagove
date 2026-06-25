@@ -12,7 +12,7 @@
 
 /* ============================================================ config */
 /* ── Paste your Cloudflare Worker URL here after deploying worker.js ── */
-const PROXY_URL = "https://reclaim-proxy.YOUR-SUBDOMAIN.workers.dev/api/chat";
+const PROXY_URL = "https://mute-art-0d12.szsmbusiness.workers.dev/api/chat";
 
 const GATE = 85;
 const MAX_REVISIONS = 2;
