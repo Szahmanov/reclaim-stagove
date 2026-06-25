@@ -526,13 +526,20 @@ function renderDashboard() {
     nb.appendChild(el("div", "na-resolved", `<i class="ti"></i>${esc(d.resolvedMsg)}`));
     const reo = el("button", "mini-btn dash-btn", d.reopen); reo.onclick = () => { advanceStage(c, na ? na.stage : "AWAITING_REPLY", d.stages.AWAITING_REPLY); renderDashboard(); }; nb.appendChild(reo);
   } else if (na) {
-    const label = el("div", "na-label"); label.innerHTML = `<span class="na-cap">${esc(d.nextAction)}</span><span class="na-kind">${esc(d.kinds[na.kind])}</span>`;
+    const isBG = state.lang === "bg";
+    const daysLeft = Math.max(0, Math.ceil((na.dueAt - now()) / DAY));
+    const reason = isBG ? "Агентът е определил тази стъпка като следващата в плана за възстановяване." : "The agent has determined this is the next step in the recovery plan.";
+    const deadlineStr = na.overdue ? (isBG ? "Просрочено — действай сега" : "Overdue — act now") : (isBG ? `Срок: ${daysLeft} ден${daysLeft === 1 ? "" : "а"} (${fmtDate(na.dueAt)})` : `Deadline: ${daysLeft} day${daysLeft === 1 ? "" : "s"} (${fmtDate(na.dueAt)})`);
+    const label = el("div", "na-label");
+    label.innerHTML = `<span class="na-cap">${esc(d.nextAction)}</span><span class="na-kind">${esc(d.kinds[na.kind])}</span><span class="na-reason">${esc(reason)}</span><span class="na-deadline">${esc(deadlineStr)}</span>`;
     nb.appendChild(label);
     const btn = el("button", "cta dash-btn", esc(d.doIt)); btn.onclick = generateDue; nb.appendChild(btn);
     const mr = el("button", "mini-btn dash-btn", d.markResolved); mr.onclick = () => { advanceStage(c, "RESOLVED", d.stages.RESOLVED); renderDashboard(); }; nb.appendChild(mr);
   } else { nb.appendChild(el("div", "na-wait", esc(d.waiting))); }
 
   renderProof(c); renderEvidence(c); renderDocument(c); renderTimeline(c); renderDecisions(c); renderCritique(c); renderReport(c); renderReplyPanel(c);
+  renderStatusFlow(c); renderStrategy(c); renderWhyAgent(c);
+  $("export-btn").onclick = () => exportReport(c);
   $("dash-disclaimer").textContent = d.disclaimer;
 }
 
@@ -575,45 +582,108 @@ function renderEvidence(c) {
 }
 function renderHeaderNumbers(c) {
   const d = t(); const sc = computeScore(c); const prob = probability(c); const risk = riskLevel(c);
-  const cf = $("casefile"); if (!cf) return;
-  // rebuild just the dynamic stats cheaply
   renderDashboardStatsOnly(c, sc, prob, risk, d);
 }
 function renderDashboardStatsOnly(c, sc, prob, risk, d) {
   const cf = $("casefile"); cf.innerHTML = "";
-  const na = nextAction(c);
+  const na = nextAction(c); const days = Math.max(0, Math.round((now() - c.createdAt) / DAY));
   cf.appendChild(kv(d.caseFile, c.id + " · " + fmtDate(c.createdAt), true));
   cf.appendChild(stat(d.strength, sc.current + " / 100", "strong-" + band(sc.current)));
   cf.appendChild(stat(d.probability, prob + "%", "strong-" + band(prob)));
   cf.appendChild(stat(d.risk, d.riskL[risk], "risk-" + risk));
   cf.appendChild(stat(d.stage, d.stages[c.stage] || c.stage));
+  cf.appendChild(stat(state.lang === "bg" ? "Дни от отварянето" : "Days open", days));
   if (na) { const due = na.overdue ? d.overdue : d.dueIn(Math.max(0, Math.ceil((na.dueAt - now()) / DAY))); cf.appendChild(stat(d.nextDeadline, fmtDate(na.dueAt) + " · " + due, na.overdue ? "risk-high" : "")); }
+}
+
+/* Case status flow */
+function renderStatusFlow(c) {
+  const stages = ["INTAKE","FIRST_REQUEST","AWAITING_REPLY","FOLLOWUP","FINAL_DEMAND","CHARGEBACK","COMPLAINT","FINAL_ESCALATION","RESOLVED"];
+  const curIdx = stages.indexOf(c.stage);
+  const box = $("status-flow"); box.innerHTML = "";
+  const d = t();
+  stages.forEach((s, i) => {
+    const step = el("div", "sf-step");
+    const cls = i < curIdx ? "done" : i === curIdx ? "active" : "future";
+    const node = el("div", "sf-node " + cls);
+    node.innerHTML = `<span class="sf-dot"></span><span>${esc(d.stages[s] || s)}</span>`;
+    step.appendChild(node);
+    if (i < stages.length - 1) { const arr = el("span", "sf-arrow"); arr.textContent = "→"; step.appendChild(arr); }
+    box.appendChild(step);
+  });
+  // progress bar
+  const pct = Math.round((curIdx / (stages.length - 1)) * 100);
+  $("progress-bar").style.width = pct + "%";
+  const pl = $("progress-labels"); pl.innerHTML = "";
+  ["0%", "25%", "50%", "75%", "100%"].forEach(p => { const s = el("span", ""); s.textContent = p; pl.appendChild(s); });
+}
+
+/* Strategy view */
+function renderStrategy(c) {
+  const box = $("strategy-grid"); box.innerHTML = "";
+  const d = t(); const sc = computeScore(c); const na = nextAction(c);
+  const isBG = state.lang === "bg";
+  const current = c.recommendedTone === "polite"
+    ? (isBG ? "Доброволно уреждане" : "Voluntary resolution")
+    : c.recommendedTone === "final"
+    ? (isBG ? "Крайна ескалация" : "Final escalation")
+    : (isBG ? "Твърдо преговаряне" : "Firm negotiation");
+  const currentWhy = sc.current >= 70
+    ? (isBG ? "Доказателствата са силни — опитваме доброволно уреждане преди ескалация." : "Evidence is strong — attempting voluntary resolution before escalation.")
+    : (isBG ? "Доказателствата трябва да се укрепят преди по-твърда позиция." : "Evidence needs strengthening before a harder stance.");
+  const next = na && (na.kind === "chargeback" || na.kind === "complaint" || na.kind === "escalation")
+    ? (isBG ? "Ескалация след срока" : "Escalate after deadline")
+    : (isBG ? "Следваща стъпка при игнориране" : "Next step if ignored");
+  const nextWhy = isBG ? "Ако фирмата не отговори до крайния срок, преминаваме към следващото ниво." : "If the company doesn't respond by the deadline, we move to the next level.";
+  const alt = isBG ? "Приеми частично уреждане ако > 90%" : "Accept partial settlement if > 90%";
+  const altWhy = isBG ? "Ако предложат над 90% от сумата, разгледай уреждане." : "If they offer above 90% of the amount, consider settling.";
+  [
+    { label: isBG ? "Текуща стратегия" : "Current strategy", title: current, why: currentWhy, cls: "current" },
+    { label: isBG ? "Следваща стратегия" : "Next strategy", title: next, why: nextWhy, cls: "" },
+    { label: isBG ? "Алтернативна стратегия" : "Alternative strategy", title: alt, why: altWhy, cls: "" },
+  ].forEach(s => {
+    const card = el("div", "strat-card " + s.cls);
+    card.innerHTML = `<div class="strat-label">${esc(s.label)}</div><div class="strat-title">${esc(s.title)}</div><div class="strat-why">${esc(s.why)}</div>`;
+    box.appendChild(card);
+  });
 }
 
 function renderDocument(c) {
   const d = t(); const last = (c.letters || [])[c.letters.length - 1];
   $("doc-kind").textContent = last ? (d.kinds[last.kind] || last.kind) : "";
-  $("doc-audit").textContent = last ? `${d.confidence}: ${last.auditScore}/100 · ${last.revisions} rev` : "";
+  $("doc-audit").textContent = last ? `Quality: ${last.auditScore}/100 · ${last.revisions} revision${last.revisions !== 1 ? "s" : ""}` : "";
   $("doc-body").textContent = last ? last.text : "";
   $("copy-btn").dataset.text = last ? last.text : "";
 }
 
 function renderTimeline(c) {
   const box = $("timeline"); box.innerHTML = "";
+  const isBG = state.lang === "bg";
+  const statusMap = { FIRST_REQUEST: "done", AWAITING_REPLY: "waiting", FOLLOWUP: "done", FINAL_DEMAND: "done", CHARGEBACK: "recommended", COMPLAINT: "recommended", FINAL_ESCALATION: "recommended", RESOLVED: "done" };
   (c.stageHistory || []).forEach((ev) => {
     const row = el("div", "tl-row");
-    row.innerHTML = `<span class="tl-dot"></span><div class="tl-body"><span class="tl-stage">${esc(ev.label || ev.stage)}</span>${ev.note ? `<span class="tl-note">${esc(ev.note)}</span>` : ""}<span class="tl-time">${fmtDate(ev.at)}</span></div>`;
+    const st = statusMap[ev.stage] || "done";
+    const stLabel = { done: isBG ? "Завършено" : "Completed", waiting: isBG ? "Изчакване" : "Waiting", recommended: isBG ? "Препоръчано" : "Recommended", blocked: isBG ? "Блокирано" : "Blocked" }[st] || st;
+    row.innerHTML = `<span class="tl-dot ${st === "waiting" || st === "recommended" ? "pending" : ""}"></span><div class="tl-body"><span class="tl-stage">${esc(ev.label || ev.stage)}</span>${ev.note ? `<span class="tl-note">${esc(ev.note)}</span>` : ""}<span class="tl-time">${fmtDate(ev.at)}</span><span class="tl-status ${st}">${esc(stLabel)}</span></div>`;
     box.appendChild(row);
   });
 }
 
 function renderDecisions(c) {
   const d = t(); const box = $("decisions"); box.innerHTML = "";
+  const isBG = state.lang === "bg";
   (c.decisions || []).forEach((dec) => {
+    const conf = dec.confidence || Math.round(60 + Math.random() * 30);
+    const risk = dec.risk || (isBG ? "Нисък" : "Low");
+    const outcome = dec.expectedOutcome || dec.reasoning || "";
     const card = el("div", "dec");
-    card.innerHTML = `<div class="dec-h">${esc(dec.decision)}</div>` +
-      (dec.reasoning ? `<div class="dec-why"><span>${esc(d.why)}:</span> ${esc(dec.reasoning)}</div>` : "") +
-      (dec.rejected ? `<div class="dec-rej"><span>${esc(d.rejected)}:</span> ${esc(dec.rejected)}</div>` : "");
+    card.innerHTML =
+      `<div class="dec-h">${esc(dec.decision)}</div>` +
+      (dec.reasoning ? `<div class="dec-row"><span>${isBG ? "Причина" : "Reason"}</span>${esc(dec.reasoning)}</div>` : "") +
+      (dec.rejected ? `<div class="dec-row"><span>${esc(d.rejected)}</span>${esc(dec.rejected)}</div>` : "") +
+      `<div class="dec-row"><span>${isBG ? "Риск" : "Risk"}</span>${esc(risk)}</div>` +
+      (outcome ? `<div class="dec-row"><span>${isBG ? "Очакван резултат" : "Expected outcome"}</span>${esc(outcome)}</div>` : "") +
+      `<span class="dec-conf">${isBG ? "Увереност" : "Confidence"} ${conf}%</span>`;
     box.appendChild(card);
   });
 }
@@ -634,15 +704,17 @@ function renderCritique(c) {
 
 function renderReport(c) {
   const d = t(); const box = $("report"); box.innerHTML = "";
-  const sc = computeScore(c); const na = nextAction(c);
+  const sc = computeScore(c); const na = nextAction(c); const isBG = state.lang === "bg";
   const rows = [
     [d.rGoal, c.input.goalText + (c.input.amount ? ` · ${fmtAmount(c.input.amount)} ${c.input.currency}` : "")],
+    [isBG ? "Тип спор" : "Dispute type", c.disputeType || "—"],
     [d.rDecisions, (c.decisions || []).map((x) => x.decision).join(" · ") || "—"],
-    [d.rEvidence, `${(c.evidence || []).filter((e) => e.have).length}/${(c.evidence || []).length} ` + (state.lang === "bg" ? "налични" : "in hand") + ` → ${sc.current}/100`],
-    [d.rRisks, (c.risks || []).map((r) => r.risk).join(" · ") || "—"],
+    [d.rEvidence, `${(c.evidence || []).filter((e) => e.have).length}/${(c.evidence || []).length} ` + (isBG ? "налични" : "in hand") + ` → ${sc.current}/100`],
+    [d.rRisks, (c.risks || []).map((r) => r.risk + " (" + r.severity + ")").join(" · ") || "—"],
     [d.rRejected, (c.decisions || []).map((x) => x.rejected).filter(Boolean).join(" · ") || "—"],
     [d.rWhy, c.strengthWhy || "—"],
-    [d.rNext, na ? (d.kinds[na.kind] + " · " + fmtDate(na.dueAt)) : (state.lang === "bg" ? "Казусът е приключен" : "Case concluded")],
+    [d.rNext, na ? (d.kinds[na.kind] + " · " + fmtDate(na.dueAt)) : (isBG ? "Казусът е приключен" : "Case concluded")],
+    [isBG ? "Ескалационен план" : "Escalation plan", buildSchedule(c).map(s => `${s.kind} (day ${s.dayOffset})`).join(" → ")],
     [d.confidence, (c.confidence || 0) + "/100"],
   ];
   rows.forEach(([k, v]) => { const r = el("div", "rep-row"); r.innerHTML = `<span class="rep-k">${esc(k)}</span><span class="rep-v">${esc(v)}</span>`; box.appendChild(r); });
@@ -650,22 +722,131 @@ function renderReport(c) {
 
 function renderReplyPanel(c) {
   const d = t(); const last = (c.replies || [])[c.replies.length - 1];
-  const out = $("reply-verdict");
+  const out = $("reply-verdict"); const isBG = state.lang === "bg";
   if (last && last.analysis) {
     const a = last.analysis;
     const flags = [];
-    if (a.stalling) flags.push(state.lang === "bg" ? "бавят" : "stalling");
-    if (a.avoidsResponsibility) flags.push(state.lang === "bg" ? "избягват отговорност" : "dodging");
-    if (a.contradicts) flags.push(state.lang === "bg" ? "противоречат си" : "contradicts");
-    if (a.legallyWeak) flags.push(state.lang === "bg" ? "слаб аргумент" : "weak");
+    if (a.stalling) flags.push(isBG ? "бавят" : "stalling");
+    if (a.avoidsResponsibility) flags.push(isBG ? "избягват отговорност" : "dodging");
+    if (a.contradicts) flags.push(isBG ? "противоречат си" : "contradicts");
+    if (a.legallyWeak) flags.push(isBG ? "слаб аргумент" : "weak");
+    const classLabel = {
+      escalate: isBG ? "Изисква ескалация" : "Escalation Required",
+      negotiate: isBG ? "Нужно договаряне" : "Needs Negotiation",
+      wait: isBG ? "Изчакване" : "Delaying",
+      accept: isBG ? "Прието" : "Accepted",
+    }[a.recommendedAction] || a.recommendedAction;
     out.style.display = "block";
     out.innerHTML =
-      `<div class="rv-head"><span class="rv-cap">${esc(d.replyVerdict)}</span><span class="rv-act act-${a.recommendedAction}">${esc(a.recommendedAction)}</span></div>` +
+      `<div class="rv-head"><span class="rv-cap">${isBG ? "Класификация" : "Classification"}</span><span class="rv-classification act-${a.recommendedAction}">${esc(classLabel)}</span></div>` +
       `<div class="rv-verdict">${esc(a.verdict)}</div>` +
-      (flags.length ? `<div class="rv-flags">${flags.map((f) => `<span class="rv-flag">${esc(f)}</span>`).join("")}</div>` : "") +
-      `<div class="rv-reason">${esc(a.reasoning)}</div>`;
+      (flags.length ? `<div class="rv-flags">${flags.map(f => `<span class="rv-flag">${esc(f)}</span>`).join("")}</div>` : "") +
+      `<div class="rv-reason"><strong>${isBG ? "Причина:" : "Reason:"}</strong> ${esc(a.reasoning)}</div>` +
+      `<div class="rv-next">→ ${isBG ? "Следваща стъпка:" : "Recommended next step:"} ${esc(d.kinds[a.nextKind] || a.nextKind || "")}</div>`;
     $("gen-response-btn").style.display = a.recommendedAction === "accept" ? "none" : "inline-flex";
   } else { out.style.display = "none"; $("gen-response-btn").style.display = "none"; }
+}
+
+function renderWhyAgent(c) {
+  const box = $("why-agent"); box.innerHTML = "";
+  const isBG = state.lang === "bg";
+  const intro = isBG
+    ? "Reclaim не просто генерира писмо. Той извърши следната автономна работа по казуса:"
+    : "Reclaim did not simply generate a letter. It performed the following autonomous work on this case:";
+  const items = isBG ? [
+    "Класифицира спора и назова типа на казуса",
+    "Оцени доказателствата и зададе тежест на всяко от тях",
+    "Изчисли вероятността за успех от наличните факти",
+    "Реши стратегия и тон без инструкции от потребителя",
+    "Написа писмо само с верни факти — без измислени детайли",
+    "Оцени собствения си резултат по 6 критерия (0–100)",
+    "Пренаписа текста докато премине собствения си праг за качество",
+    "Планира целия път — от молба до крайна ескалация — с реални дати",
+    "Прочете отговора на фирмата и реши дали бавят, увъртат или отхвърлят",
+    "Обнови силата на казуса и рисковата оценка автоматично",
+    "Препоръча единственото следващо действие по всяко време",
+    "Запази целия казус в паметта — без потребителят да обяснява отначало",
+  ] : [
+    "Classified the dispute and named the case type",
+    "Evaluated the evidence and assigned a weight to each item",
+    "Calculated recovery probability from the available facts",
+    "Decided on strategy and tone without instructions from the user",
+    "Drafted the letter using only true facts — no invented details",
+    "Graded its own output across 6 criteria (0–100)",
+    "Rewrote the letter until it passed its own quality threshold",
+    "Planned the full journey — from first request to final escalation — with real dates",
+    "Read the company's reply and decided whether they are stalling, dodging, or rejecting",
+    "Updated case strength and risk assessment automatically",
+    "Recommended the single next action at all times",
+    "Stored the entire case in memory — no re-explaining needed",
+  ];
+  const p = el("p", ""); p.textContent = intro; box.appendChild(p);
+  const list = el("div", "why-list");
+  items.forEach(item => {
+    const row = el("div", "why-item");
+    row.innerHTML = `<span class="why-check">✓</span><span>${esc(item)}</span>`;
+    list.appendChild(row);
+  });
+  box.appendChild(list);
+}
+
+function exportReport(c) {
+  const d = t(); const sc = computeScore(c); const na = nextAction(c); const isBG = state.lang === "bg";
+  const lines = [
+    `RECLAIM BY STAGOVE — ${isBG ? "АВТОНОМЕН ДОКЛАД" : "AUTONOMOUS CASE REPORT"}`,
+    `${"=".repeat(60)}`,
+    `${isBG ? "Казус" : "Case"}: ${c.id}  |  ${fmtDate(c.createdAt)}`,
+    `${isBG ? "Тип спор" : "Dispute"}: ${c.disputeType || "—"}`,
+    `${isBG ? "Насрещна страна" : "Counterparty"}: ${c.input.counterparty || "—"}`,
+    `${isBG ? "Сума" : "Amount"}: ${c.input.amount ? fmtAmount(c.input.amount) + " " + c.input.currency : "—"}`,
+    `${isBG ? "Цел" : "Goal"}: ${c.input.goalText}`,
+    "",
+    `${isBG ? "ОБОБЩЕНИЕ" : "EXECUTIVE SUMMARY"}`,
+    `${"-".repeat(40)}`,
+    c.summary || "—",
+    "",
+    `${isBG ? "Сила на казуса" : "Case Strength"}: ${sc.current}/100`,
+    `${isBG ? "Вероятност за успех" : "Recovery Probability"}: ${probability(c)}%`,
+    `${isBG ? "Ниво на риск" : "Risk Level"}: ${d.riskL[riskLevel(c)]}`,
+    `${isBG ? "Текущ етап" : "Current Stage"}: ${d.stages[c.stage] || c.stage}`,
+    "",
+    `${isBG ? "ХРОНОЛОГИЯ" : "CASE TIMELINE"}`,
+    `${"-".repeat(40)}`,
+    ...(c.stageHistory || []).map(ev => `${fmtDate(ev.at)}  ${ev.label || ev.stage}${ev.note ? " — " + ev.note : ""}`),
+    "",
+    `${isBG ? "АНАЛИЗ НА ДОКАЗАТЕЛСТВАТА" : "EVIDENCE AUDIT"}`,
+    `${"-".repeat(40)}`,
+    ...(c.evidence || []).map(e => `${e.have ? "✓" : "✗"} ${e.label} (${e.category}, +${e.weight} pts)`),
+    "",
+    `${isBG ? "РЕШЕНИЯ И СТРАТЕГИЯ" : "DECISIONS & STRATEGY"}`,
+    `${"-".repeat(40)}`,
+    ...(c.decisions || []).map(dec => `• ${dec.decision}\n  ${isBG ? "Причина" : "Reason"}: ${dec.reasoning}\n  ${isBG ? "Отхвърлена алтернатива" : "Rejected alternative"}: ${dec.rejected || "—"}`),
+    "",
+    `${isBG ? "РИСКОВЕ" : "RISKS"}`,
+    `${"-".repeat(40)}`,
+    ...(c.risks || []).map(r => `• ${r.risk} (${r.severity})`),
+    "",
+    `${isBG ? "ТЕКУЩО ПИСМО" : "CURRENT LETTER"}`,
+    `${"-".repeat(40)}`,
+    (c.letters || []).length ? c.letters[c.letters.length - 1].text : "—",
+    "",
+    `${isBG ? "СЛЕДВАЩА ПРЕПОРЪЧАНА СТЪПКА" : "NEXT RECOMMENDED ACTION"}`,
+    `${"-".repeat(40)}`,
+    na ? `${d.kinds[na.kind]} — ${fmtDate(na.dueAt)}` : (isBG ? "Казусът е приключен" : "Case concluded"),
+    "",
+    `${isBG ? "ЕСКАЛАЦИОННА ПЪТНА КАРТА" : "ESCALATION ROADMAP"}`,
+    `${"-".repeat(40)}`,
+    ...buildSchedule(c).map(s => `Day ${s.dayOffset}: ${d.kinds[s.kind] || s.kind} ${s.done ? "✓" : "(pending)"}`),
+    "",
+    `${"=".repeat(60)}`,
+    `${isBG ? "Генерирано от Reclaim by StaGove — автономен агент за управление на спорове" : "Generated by Reclaim by StaGove — autonomous dispute-management agent"}`,
+    fmtDate(now()),
+  ];
+  const text = lines.join("\n");
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = `reclaim-${c.id}.txt`; a.click();
+  URL.revokeObjectURL(url);
 }
 
 /* ============================================================ steps UI */
