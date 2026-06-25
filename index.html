@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Reclaim by StaGove — autonomous dispute manager</title>
-<meta name="description" content="Reclaim opens a persistent case and autonomously manages a consumer money-recovery dispute end to end: scores it, plans every step with deadlines, drafts letters, reads replies, and always tells you the next action.">
+<meta name="description" content="Reclaim opens a persistent case and autonomously manages a consumer money-recovery dispute end to end.">
 <meta name="theme-color" content="#15564B">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -30,7 +30,7 @@
       <button id="lang-en" class="on" type="button">EN</button>
       <button id="lang-bg" type="button">BG</button>
     </div>
-    <button id="key-btn" class="ghost-btn" type="button" style="display:none"><span id="key-dot" class="key-dot" aria-hidden="true"></span><span id="key-btn-label">API key</span></button>
+    <button id="key-btn" class="ghost-btn" type="button" style="display:none"><span id="key-dot" class="key-dot"></span><span id="key-btn-label">Settings</span></button>
   </div>
 </header>
 
@@ -43,7 +43,7 @@
   </section>
 
   <!-- INTAKE -->
-  <section class="panel" id="intake" aria-label="Open a case">
+  <section class="panel" id="intake">
     <label class="fld" for="story" id="lbl-story">What happened? <span class="hint" id="lbl-story-hint"></span></label>
     <textarea id="story" placeholder="e.g. I cancelled my gym membership in writing on 3 March, but they charged me again on 1 April (€39.99) and refuse to refund it. I have the confirmation email."></textarea>
     <div class="grid">
@@ -77,32 +77,55 @@
   <!-- DASHBOARD -->
   <section class="dashboard" id="dashboard" style="display:none" aria-live="polite">
 
+    <!-- CASE HEAD -->
     <div class="case-head">
       <div class="case-head-top">
         <span class="case-amount" id="case-amount"></span>
         <span class="spacer"></span>
+        <button class="mini-btn dash-btn" id="export-btn" type="button" id="export-btn">⬇ Export report</button>
         <button class="mini-btn dash-btn" id="delete-case-btn" type="button">Delete case</button>
       </div>
       <p class="case-summary" id="case-summary"></p>
+
+      <!-- CASE PROGRESS BAR -->
+      <div class="progress-wrap">
+        <div class="progress-bar-outer"><div class="progress-bar-inner" id="progress-bar"></div></div>
+        <div class="progress-labels" id="progress-labels"></div>
+      </div>
+
+      <!-- STATS GRID -->
       <div class="casefile" id="casefile"></div>
+
+      <!-- NEXT BEST ACTION -->
       <div class="next-action" id="next-action"></div>
       <div class="dash-busy" id="dash-busy"><span class="spin"></span></div>
     </div>
 
-    <p class="section-label" id="sec-proof">Proof of autonomy</p>
+    <!-- CASE STATUS FLOW -->
+    <p class="section-label" id="sec-status">Case status</p>
+    <div class="status-flow" id="status-flow"></div>
+
+    <!-- STRATEGY VIEW -->
+    <p class="section-label" id="sec-strategy">Recovery strategy</p>
+    <div class="strategy-grid" id="strategy-grid"></div>
+
+    <!-- PROOF OF AUTONOMY -->
+    <p class="section-label" id="sec-proof">Autonomous work completed</p>
     <div class="proof" id="proof"></div>
 
-    <p class="section-label" id="sec-evidence">Evidence engine</p>
+    <!-- EVIDENCE ENGINE -->
+    <p class="section-label" id="sec-evidence">Evidence audit</p>
     <div class="panel alt sim">
       <div class="sim-bars">
         <div class="sim-line"><span class="sim-cap" id="sim-now-cap">Current score</span><span class="sim-num" id="ev-now">0</span></div>
         <div class="bar"><div class="bar-fill strong-moderate" id="ev-now-fill" style="width:0%"></div></div>
-        <div class="sim-line"><span class="sim-cap muted" id="sim-pot-cap">If you add the missing evidence</span><span class="sim-num muted" id="ev-pot">0</span></div>
+        <div class="sim-line"><span class="sim-cap muted" id="sim-pot-cap">Potential with full evidence</span><span class="sim-num muted" id="ev-pot">0</span></div>
         <div class="bar ghost"><div class="bar-fill ghostfill" id="ev-pot-fill" style="width:0%"></div></div>
       </div>
       <div class="evidence-list" id="evidence-list"></div>
     </div>
 
+    <!-- CURRENT DOCUMENT -->
     <p class="section-label" id="sec-doc">Current document</p>
     <div class="doc">
       <div class="doc-bar">
@@ -116,35 +139,43 @@
       <div class="doc-body" id="doc-body"></div>
     </div>
 
-    <p class="section-label" id="sec-reply">Reply analyzer</p>
+    <!-- REPLY ANALYZER -->
+    <p class="section-label" id="sec-reply">Company reply analyzer</p>
     <div class="panel alt">
       <textarea id="reply-input" placeholder=""></textarea>
       <div class="actions tight">
         <button class="mini-btn solid dash-btn" id="analyze-reply-btn" type="button">Analyze reply</button>
-        <button class="cta small dash-btn" id="gen-response-btn" type="button" style="display:none">Generate the next response</button>
+        <button class="cta small dash-btn" id="gen-response-btn" type="button" style="display:none">Generate response</button>
       </div>
       <div class="reply-verdict" id="reply-verdict" style="display:none"></div>
     </div>
 
+    <!-- TIMELINE + DECISIONS -->
     <div class="two-col">
       <div>
-        <p class="section-label" id="sec-timeline">Autonomous timeline</p>
+        <p class="section-label" id="sec-timeline">Case timeline</p>
         <div class="timeline" id="timeline"></div>
       </div>
       <div>
-        <p class="section-label" id="sec-decisions">Decision engine</p>
+        <p class="section-label" id="sec-decisions">Decision log</p>
         <div class="decisions" id="decisions"></div>
       </div>
     </div>
 
+    <!-- SELF-CRITIQUE -->
     <p class="section-label" id="sec-critique">Agent self-critique</p>
     <div class="panel alt">
       <div class="critique-body" id="critique-body"></div>
-      <div class="actions tight"><button class="mini-btn solid dash-btn" id="run-critique-btn" type="button">Have the agent review the case now</button></div>
+      <div class="actions tight"><button class="mini-btn solid dash-btn" id="run-critique-btn" type="button">Review case now</button></div>
     </div>
 
+    <!-- AUTONOMOUS DECISION REPORT -->
     <p class="section-label" id="sec-report">Autonomous decision report</p>
     <div class="report" id="report"></div>
+
+    <!-- WHY AUTONOMOUS AGENT -->
+    <p class="section-label" id="sec-why">Why this required an autonomous agent</p>
+    <div class="why-agent" id="why-agent"></div>
 
     <p class="disclaimer" id="dash-disclaimer"></p>
   </section>
@@ -152,22 +183,21 @@
   <footer><span>Reclaim · a StaGove agent</span><span class="spacer"></span><span id="foot-note"></span></footer>
 </main>
 
-<!-- key modal -->
+<!-- model modal (settings) -->
 <div class="overlay" id="overlay">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <button class="close" id="modal-close" aria-label="Close">×</button>
-    <h3 id="modal-title">Connect your free Groq key</h3>
+    <h3 id="modal-title">Settings</h3>
     <p class="sub" id="modal-sub"></p>
-    <label class="fld" for="key-input" id="key-label">Groq API key</label>
-    <input type="text" id="key-input" placeholder="gsk_..." autocomplete="off" spellcheck="false">
+    <label class="fld" for="key-input" id="key-label" style="display:none">API key</label>
+    <input type="text" id="key-input" style="display:none">
     <label class="fld" for="model-input" id="model-label">Model</label>
     <select id="model-input">
       <option value="llama-3.3-70b-versatile">Llama 3.3 70B — best quality (recommended)</option>
-      <option value="llama-3.1-8b-instant">Llama 3.1 8B — fastest, lighter</option>
+      <option value="llama-3.1-8b-instant">Llama 3.1 8B — fastest</option>
       <option value="openai/gpt-oss-120b">GPT-OSS 120B — strong reasoning</option>
     </select>
-    <div class="test-row"><button class="cta" id="test-btn" type="button"><span id="test-label">Test &amp; save</span></button><span class="test-out" id="test-out"></span></div>
-    <p class="fineprint" id="key-fine">No key yet? Create one free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a> — no credit card. The free tier is rate-limited per account, so each user brings their own key: it keeps the agent free forever and lets it scale to any number of users.</p>
+    <div class="test-row"><button class="cta" id="test-btn" type="button"><span id="test-label">Save</span></button><span class="test-out" id="test-out"></span></div>
   </div>
 </div>
 
