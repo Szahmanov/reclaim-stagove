@@ -1,0 +1,18 @@
+{
+  "name": "Reclaim by StaGove",
+  "short_name": "Reclaim",
+  "description": "Autonomous money-recovery agent: build your case, write a ready-to-send letter, map every escalation step.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F3EF",
+  "theme_color": "#15564B",
+  "orientation": "portrait-primary",
+  "lang": "en",
+  "categories": ["finance", "productivity", "utilities"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reclaim by StaGove — autonomous dispute manager</title>
+<meta name="description" content="Reclaim opens a persistent case and autonomously manages a consumer money-recovery dispute end to end: scores it, plans every step with deadlines, drafts letters, reads replies, and always tells you the next action.">
+<meta name="theme-color" content="#15564B">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="Reclaim home">
+      <img class="mark" src="icon-192.png" alt="">
+      <span class="name">Reclaim</span>
+      <span class="by">by StaGove</span>
+    </a>
+    <span class="spacer"></span>
+    <button id="cases-btn" class="ghost-btn" type="button"><i>≣</i> <span id="cases-btn-label">Cases</span></button>
+    <button id="newcase-btn" class="ghost-btn" type="button">+ <span id="newcase-label">New case</span></button>
+    <div class="lang" role="group" aria-label="Language">
+      <button id="lang-en" class="on" type="button">EN</button>
+      <button id="lang-bg" type="button">BG</button>
+    </div>
+    <button id="key-btn" class="ghost-btn" type="button" style="display:none"><span id="key-dot" class="key-dot" aria-hidden="true"></span><span id="key-btn-label">API key</span></button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero" id="hero">
+    <p class="eyebrow" id="hero-eyebrow">Autonomous dispute-management agent</p>
+    <h1 id="hero-h1">A whole case. <em>One</em> agent.</h1>
+    <p class="lede" id="hero-lede"></p>
+  </section>
+
+  <!-- INTAKE -->
+  <section class="panel" id="intake" aria-label="Open a case">
+    <label class="fld" for="story" id="lbl-story">What happened? <span class="hint" id="lbl-story-hint"></span></label>
+    <textarea id="story" placeholder="e.g. I cancelled my gym membership in writing on 3 March, but they charged me again on 1 April (€39.99) and refuse to refund it. I have the confirmation email."></textarea>
+    <div class="grid">
+      <div>
+        <label class="fld" for="amount" id="lbl-amount">Amount at stake</label>
+        <div class="row2">
+          <input type="text" id="amount" inputmode="decimal" placeholder="39.99">
+          <select id="currency" aria-label="Currency"><option>EUR</option><option>BGN</option><option>USD</option><option>GBP</option><option>CHF</option><option>RON</option><option>Other</option></select>
+        </div>
+      </div>
+      <div><label class="fld" for="counterparty" id="lbl-cp">Who are you dealing with?</label><input type="text" id="counterparty" placeholder="company, landlord, airline, shop…"></div>
+      <div><label class="fld" for="goal" id="lbl-goal">What do you want?</label>
+        <select id="goal"><option value="refund">A refund</option><option value="fee">A fee removed / reversed</option><option value="deposit">My deposit returned</option><option value="replacement">A repair or replacement</option><option value="compensation">Compensation</option><option value="cancel">To cancel and stop charges</option><option value="other">Something else</option></select>
+      </div>
+      <div><label class="fld" for="region" id="lbl-region">Your country / region</label><input type="text" id="region" placeholder="Bulgaria · EU"></div>
+      <div><label class="fld" for="tone" id="lbl-tone">Tone</label>
+        <select id="tone"><option value="auto" selected>Let the agent decide</option><option value="polite">Polite first request</option><option value="firm">Firm</option><option value="final">Final demand</option></select>
+      </div>
+      <div><label class="fld" for="outlang" id="lbl-outlang">Letter language</label>
+        <select id="outlang"><option value="English">English</option><option value="Bulgarian">Български</option><option value="German">Deutsch</option><option value="Spanish">Español</option><option value="French">Français</option></select>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="cta" id="run-btn" type="button"><span id="run-label">Open my case</span></button>
+      <span class="note" id="run-note"></span>
+    </div>
+    <div class="msg" id="msg"></div>
+    <div class="working" id="intake-working" aria-live="polite"><div class="steps" id="intake-steps"></div></div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section class="dashboard" id="dashboard" style="display:none" aria-live="polite">
+
+    <div class="case-head">
+      <div class="case-head-top">
+        <span class="case-amount" id="case-amount"></span>
+        <span class="spacer"></span>
+        <button class="mini-btn dash-btn" id="delete-case-btn" type="button">Delete case</button>
+      </div>
+      <p class="case-summary" id="case-summary"></p>
+      <div class="casefile" id="casefile"></div>
+      <div class="next-action" id="next-action"></div>
+      <div class="dash-busy" id="dash-busy"><span class="spin"></span></div>
+    </div>
+
+    <p class="section-label" id="sec-proof">Proof of autonomy</p>
+    <div class="proof" id="proof"></div>
+
+    <p class="section-label" id="sec-evidence">Evidence engine</p>
+    <div class="panel alt sim">
+      <div class="sim-bars">
+        <div class="sim-line"><span class="sim-cap" id="sim-now-cap">Current score</span><span class="sim-num" id="ev-now">0</span></div>
+        <div class="bar"><div class="bar-fill strong-moderate" id="ev-now-fill" style="width:0%"></div></div>
+        <div class="sim-line"><span class="sim-cap muted" id="sim-pot-cap">If you add the missing evidence</span><span class="sim-num muted" id="ev-pot">0</span></div>
+        <div class="bar ghost"><div class="bar-fill ghostfill" id="ev-pot-fill" style="width:0%"></div></div>
+      </div>
+      <div class="evidence-list" id="evidence-list"></div>
+    </div>
+
+    <p class="section-label" id="sec-doc">Current document</p>
+    <div class="doc">
+      <div class="doc-bar">
+        <span class="t" id="doc-kind"></span>
+        <span class="doc-audit" id="doc-audit"></span>
+        <span class="spacer"></span>
+        <button class="mini-btn dash-btn" id="softer-btn" type="button">Softer</button>
+        <button class="mini-btn dash-btn" id="firmer-btn" type="button">Firmer</button>
+        <button class="mini-btn dash-btn" id="copy-btn" type="button">Copy</button>
+      </div>
+      <div class="doc-body" id="doc-body"></div>
+    </div>
+
+    <p class="section-label" id="sec-reply">Reply analyzer</p>
+    <div class="panel alt">
+      <textarea id="reply-input" placeholder=""></textarea>
+      <div class="actions tight">
+        <button class="mini-btn solid dash-btn" id="analyze-reply-btn" type="button">Analyze reply</button>
+        <button class="cta small dash-btn" id="gen-response-btn" type="button" style="display:none">Generate the next response</button>
+      </div>
+      <div class="reply-verdict" id="reply-verdict" style="display:none"></div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <p class="section-label" id="sec-timeline">Autonomous timeline</p>
+        <div class="timeline" id="timeline"></div>
+      </div>
+      <div>
+        <p class="section-label" id="sec-decisions">Decision engine</p>
+        <div class="decisions" id="decisions"></div>
+      </div>
+    </div>
+
+    <p class="section-label" id="sec-critique">Agent self-critique</p>
+    <div class="panel alt">
+      <div class="critique-body" id="critique-body"></div>
+      <div class="actions tight"><button class="mini-btn solid dash-btn" id="run-critique-btn" type="button">Have the agent review the case now</button></div>
+    </div>
+
+    <p class="section-label" id="sec-report">Autonomous decision report</p>
+    <div class="report" id="report"></div>
+
+    <p class="disclaimer" id="dash-disclaimer"></p>
+  </section>
+
+  <footer><span>Reclaim · a StaGove agent</span><span class="spacer"></span><span id="foot-note"></span></footer>
+</main>
+
+<!-- key modal -->
+<div class="overlay" id="overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <button class="close" id="modal-close" aria-label="Close">×</button>
+    <h3 id="modal-title">Connect your free Groq key</h3>
+    <p class="sub" id="modal-sub"></p>
+    <label class="fld" for="key-input" id="key-label">Groq API key</label>
+    <input type="text" id="key-input" placeholder="gsk_..." autocomplete="off" spellcheck="false">
+    <label class="fld" for="model-input" id="model-label">Model</label>
+    <select id="model-input">
+      <option value="llama-3.3-70b-versatile">Llama 3.3 70B — best quality (recommended)</option>
+      <option value="llama-3.1-8b-instant">Llama 3.1 8B — fastest, lighter</option>
+      <option value="openai/gpt-oss-120b">GPT-OSS 120B — strong reasoning</option>
+    </select>
+    <div class="test-row"><button class="cta" id="test-btn" type="button"><span id="test-label">Test &amp; save</span></button><span class="test-out" id="test-out"></span></div>
+    <p class="fineprint" id="key-fine">No key yet? Create one free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a> — no credit card. The free tier is rate-limited per account, so each user brings their own key: it keeps the agent free forever and lets it scale to any number of users.</p>
+  </div>
+</div>
+
+<!-- cases drawer -->
+<div class="overlay" id="cases-drawer">
+  <div class="drawer" role="dialog" aria-modal="true">
+    <div class="drawer-head"><h3 id="cases-title">Cases</h3><button class="close" id="cases-close" aria-label="Close">×</button></div>
+    <div class="cases-list" id="cases-list"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
