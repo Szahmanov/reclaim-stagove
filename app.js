@@ -12,7 +12,7 @@
 
 /* ============================================================ config */
 /* ── Paste your Cloudflare Worker URL here after deploying worker.js ── */
-const PROXY_URL = "https://mute-art-0d12.szsmbusiness.workers.dev/api/chat";
+const PROXY_URL = "https://reclaim-proxy.YOUR-SUBDOMAIN.workers.dev/api/chat";
 
 const GATE = 85;
 const MAX_REVISIONS = 2;
@@ -719,25 +719,23 @@ function setLang(l) { state.lang = l; localStorage.setItem(LS.lang, l); applyLan
 
 function showMsg(text, kind) { const m = $("msg"); m.textContent = text; m.className = `msg show ${kind || "warn"}`; }
 function clearMsg() { $("msg").className = "msg"; }
-function refreshKeyDot() { $("key-dot").classList.toggle("ok", !!state.key); }
+function refreshKeyDot() {}
 
-function openModal() { $("key-input").value = state.key; $("model-input").value = state.model; $("test-out").textContent = ""; $("overlay").classList.add("show"); $("key-input").focus(); }
+function openModal() { $("model-input").value = state.model; $("test-out").textContent = ""; $("overlay").classList.add("show"); }
 function closeModal() { $("overlay").classList.remove("show"); }
 function openCases() { renderCasesMenu(); $("cases-drawer").classList.add("show"); }
 function closeCases() { $("cases-drawer").classList.remove("show"); }
 
 async function testAndSave() {
-  const k = $("key-input").value.trim(); const out = $("test-out"); const d = t();
-  if (!k) { out.textContent = d.testEmpty; out.className = "test-out bad"; return; }
+  const out = $("test-out"); const d = t();
   out.textContent = d.testing; out.className = "test-out";
-  const pk = state.key, pm = state.model; state.key = k; state.model = $("model-input").value;
-  try { await groq([{ role: "user", content: "ping" }], { maxTokens: 5, temp: 0 }); localStorage.setItem(LS.key, k); localStorage.setItem(LS.model, state.model); out.textContent = d.testOk; out.className = "test-out ok"; refreshKeyDot(); clearMsg(); setTimeout(closeModal, 700); }
-  catch (e) { state.key = pk; state.model = pm; out.textContent = e.code === "auth" ? d.testBad : messageFor(e); out.className = "test-out bad"; }
+  state.model = $("model-input").value; localStorage.setItem(LS.model, state.model);
+  out.textContent = d.testOk; out.className = "test-out ok"; setTimeout(closeModal, 700);
 }
 
 /* ============================================================ init */
 function init() {
-  applyLang(); refreshKeyDot();
+  applyLang();
   $("run-btn").addEventListener("click", runIntake);
   $("lang-en").addEventListener("click", () => setLang("en"));
   $("lang-bg").addEventListener("click", () => setLang("bg"));
@@ -766,7 +764,7 @@ function init() {
 
   // open the active case if one exists (memory / autonomy heartbeat on load)
   if (getActive()) { showView("dashboard"); renderDashboard(); }
-  else { showView("intake"); if (!state.key) setTimeout(() => showMsg(t().errNoKey, "warn"), 600); }
+  else { showView("intake"); }
 
   if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
